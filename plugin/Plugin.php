@@ -1,10 +1,11 @@
 <?php
 
-// TODO: Replace the namespace 'Example' to your plugin name.
-namespace TypechoPlugin\Example;
+namespace TypechoPlugin\CfImageProxy;
 
 use Typecho\Plugin\PluginInterface;
 use Typecho\Widget\Helper\Form;
+use Utils\Helper;
+use Widget\Base\Contents;
 
 if (!defined('__TYPECHO_ROOT_DIR__')) {
     exit;
@@ -20,40 +21,57 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  */
 class Plugin implements PluginInterface
 {
-    /**
-     * Activate plugin method, if activated failed, throw exception will disable this plugin.
-     */
-    public static function activate()
+   public static function activate()
     {
-        // TODO: Implement activate() method.
+        Contents::pluginHandle()->contentEx = __CLASS__ . '::filter';
+        Contents::pluginHandle()->excerptEx = __CLASS__ . '::filter';
     }
 
-    /**
-     * Deactivate plugin method, if deactivated failed, throw exception will enable this plugin.
-     */
     public static function deactivate()
     {
-        // TODO: Implement deactivate() method.
     }
 
-    /**
-     * Plugin config panel render method.
-     *
-     * @param Form $form
-     */
     public static function config(Form $form)
     {
-        // TODO: Implement config() method.
+        $workerUrl = new Form\Element\Text('workerUrl', null, '',
+            'Cloudflare Worker 地址', '例如：https://imgproxy.example.workers.dev/');
+        $form->addInput($workerUrl->addRule('required', '必须填写 Worker 地址'));
+
+        $secretKey = new Form\Element\Text('secretKey', null, '',
+            '加密密钥（hex 格式）', '32字节（256位）十六进制字符串，用于 AES-GCM 加密');
+        $form->addInput($secretKey->addRule('required', '必须填写加密密钥'));
+    }
+
+    public static function personalConfig(Form $form)
+    {
+    }
+
+    public static function filter($content, $widget, $last)
+    {
+        $workerUrl = Helper::options()->plugin('CfImageProxy')->workerUrl;
+        $secretHex = Helper::options()->plugin('CfImageProxy')->secretKey;
+        if (empty($workerUrl) || empty($secretHex)) return $content;
+
+        // 匹配所有 <img> 标签
+        return preg_replace_callback('/<img\s+[^>]*src=["\']([^"\']+)["\'][^>]*>/i', function ($matches) use ($workerUrl, $secretHex) {
+            $originalUrl = $matches[1];
+            $encrypted = self::encrypt($originalUrl, $secretHex);
+            $encoded = rtrim(strtr(base64_encode($encrypted), '+/', '-_'), '=');
+            $proxyUrl = rtrim($workerUrl, '/') . '?u=' . $encoded;
+            return str_replace($originalUrl, $proxyUrl, $matches[0]);
+        }, $content);
     }
 
     /**
-     * Plugin personal config panel render method.
-     *
-     * @param Form $form
+     * AES-GCM 加密
      */
-    public static function personalConfig(Form $form)
+    private static function encrypt($data, $keyHex)
     {
-        // TODO: Implement personalConfig() method.
+        $key = hex2bin($keyHex);
+        $iv = random_bytes(12);
+        $tag = '';
+        $ciphertext = openssl_encrypt($data, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+        return $iv . $ciphertext . $tag;
     }
 }
 
