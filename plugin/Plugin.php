@@ -11,12 +11,12 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
 }
 
 /**
- * %description%
+ * 
  *
- * @package %name%
- * @author %author%
+ * @package typecho-plugin-cfimageproxy
+ * @author joyqi
  * @version %version%
- * @link %link%
+ * @link https://github.com/joyqi/typecho-plugin-cfimageproxy
  */
 class Plugin implements PluginInterface
 {
