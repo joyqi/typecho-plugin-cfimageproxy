@@ -52,19 +52,19 @@ class Plugin implements PluginInterface
         }, _t( '加密密钥格式错误，必须是 64 字节的十六进制字符串'));
         $form->addInput($secretKey);
 
-        $maxWidth = new Form\Element\Number('maxWidth', null, 1024,
+        $maxWidth = new Form\Element\Text('maxWidth', null, 1024,
             _t('最大宽度'), _t('最大宽度，单位 px'));
         $maxWidth->addRule('required', _t('必须填写最大宽度'));
         $maxWidth->addRule('isInteger', _t('最大宽度必须是整数'));
         $form->addInput($maxWidth);
 
-        $maxHeight = new Form\Element\Number('maxHeight', null, 0,
+        $maxHeight = new Form\Element\Text('maxHeight', null, 0,
             _t('最大高度'), _t('最大高度，单位 px'));
         $maxHeight->addRule('required', _t('必须填写最大高度'));
         $maxHeight->addRule('isInteger', _t('最大高度必须是整数'));
         $form->addInput($maxHeight);
 
-        $quality = new Form\Element\Number('quality', null, 80,
+        $quality = new Form\Element\Text('quality', null, 80,
             _t('图片质量'), _t('图片质量，范围 1-100'));
         $quality->addRule('required', _t('必须填写图片质量'));
         $quality->addRule('isInteger', _t('图片质量必须是整数'));
