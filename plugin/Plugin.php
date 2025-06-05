@@ -98,6 +98,9 @@ class Plugin implements PluginInterface
             overflow: auto;
             overscroll-behavior: contain;
             outline: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .cf-image-loading {
@@ -164,6 +167,7 @@ class Plugin implements PluginInterface
                         
                         closeButton.addEventListener("click", function() {
                             dialog.close("cancel");
+                            dialog.remove();
                         });
                         
                         image.addEventListener("load", function() {
