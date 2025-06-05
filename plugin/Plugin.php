@@ -5,6 +5,7 @@ namespace TypechoPlugin\CfImageProxy;
 use Typecho\Plugin\PluginInterface;
 use Typecho\Widget\Helper\Form;
 use Utils\Helper;
+use Widget\Archive;
 use Widget\Base\Contents;
 
 if (!defined('__TYPECHO_ROOT_DIR__')) {
@@ -25,6 +26,7 @@ class Plugin implements PluginInterface
     {
         Contents::pluginHandle()->contentEx = __CLASS__ . '::filter';
         Contents::pluginHandle()->excerptEx = __CLASS__ . '::filter';
+        Archive::pluginHandle()->header = __CLASS__ . '::header';
     }
 
     public static function deactivate()
@@ -73,6 +75,122 @@ class Plugin implements PluginInterface
 
     public static function personalConfig(Form $form)
     {
+    }
+
+    public static function header()
+    {
+        echo '<style>
+        body:has(dialog[open]) {
+            overflow: hidden;
+        }
+
+        img[data-cfimageproxy] {
+            cursor: pointer;
+        }
+        
+        .cf-image-dialog {
+            box-sizing: border-box;
+            max-width: 100vw;
+            max-height: 100vh;
+            padding: 40px;
+            border: none;
+            background: transparent;
+            overflow: auto;
+            overscroll-behavior: contain;
+            outline: none;
+        }
+        
+        .cf-image-loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        .cf-image-dialog img {
+            display: block;
+        }
+        
+        .cf-image-dialog button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        
+        .cf-image-dialog button:after {
+            content: "✕";
+            font-size: 20px;
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        ::backdrop {
+            background: rgba(0, 0, 0, 0.8);
+            overscroll-behavior: contain;
+        }
+        </style>';
+
+        echo '<script>
+            document.addEventListener("DOMContentLoaded", function() {
+                const images = document.querySelectorAll("img[data-cfimageproxy]");
+                images.forEach(img => {
+                    img.addEventListener("click", function() {
+                        const dialog = document.createElement("dialog");
+                        const closeButton = document.createElement("button");
+                        const image = document.createElement("img");
+                        const loading = document.createElement("div");
+                        
+                        closeButton.setAttribute("autoFocus", "true");
+                        image.src = img.dataset.originalSrc;
+                        loading.classList.add("cf-image-loading");
+                        dialog.classList.add("cf-image-dialog");
+                        dialog.appendChild(loading);
+                        document.body.appendChild(dialog);
+                        
+                        closeButton.addEventListener("click", function() {
+                            dialog.close("cancel");
+                        });
+                        
+                        image.addEventListener("load", function() {
+                            const padding = parseInt(getComputedStyle(dialog).padding) || 0;
+                            const pixelRatio = window.devicePixelRatio > 1 ? 2 : 1;
+                            const w = image.naturalWidth / pixelRatio;
+                            const h = image.naturalHeight / pixelRatio;
+                            
+                            console.log(image.naturalWidth, image.naturalHeight, pixelRatio, w, h);
+                            
+                            const ratio = Math.min(
+                                (window.innerWidth - padding * 2) / w,
+                                (window.innerHeight - padding * 2) / h 
+                            );
+                            
+                            image.style.width = Math.min(w, w * ratio) + "px";
+                            image.style.height = Math.min(h, h * ratio) + "px";
+                            dialog.removeChild(loading);
+                            dialog.appendChild(closeButton);
+                            dialog.appendChild(image);
+                        });
+                        
+                        dialog.showModal();
+                    });
+                });
+            });
+        </script>';
     }
 
     public static function filter($content, $widget, $last)
