@@ -172,8 +172,6 @@ class Plugin implements PluginInterface
                             const w = image.naturalWidth / pixelRatio;
                             const h = image.naturalHeight / pixelRatio;
                             
-                            console.log(image.naturalWidth, image.naturalHeight, pixelRatio, w, h);
-                            
                             const ratio = Math.min(
                                 (window.innerWidth - padding * 2) / w,
                                 (window.innerHeight - padding * 2) / h 
