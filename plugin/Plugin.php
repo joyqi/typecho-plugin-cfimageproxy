@@ -85,22 +85,31 @@ class Plugin implements PluginInterface
 
         if (empty($workerUrl) || empty($secretKey)) return $content;
 
+        $buildUrl = function ($ratio, $originalUrl) use ($workerUrl, $secretKey, $maxWidth, $maxHeight, $quality) {
+            $metaData = json_encode([
+                'maxWidth' => $maxWidth * $ratio,
+                'maxHeight' => $maxHeight * $ratio,
+                'quality' => $quality,
+            ]);
+            $data = $metaData . '|' . $originalUrl;
+
+            $encrypted = self::encrypt($data, $secretKey);
+            $encoded = rtrim(strtr(base64_encode($encrypted), '+/', '-_'), '=');
+            return $workerUrl . '?u=' . $encoded;
+        };
+
         // 匹配所有 <img> 标签
         return preg_replace_callback(
-            '/<img\s+[^>]*src=["\']([^"\']+)["\'][^>]*>/i',
-            function ($matches) use ($workerUrl, $secretKey, $maxHeight, $maxWidth, $quality) {
-                $originalUrl = $matches[1];
-                $metaData = json_encode([
-                    'maxWidth' => $maxWidth,
-                    'maxHeight' => $maxHeight,
-                    'quality' => $quality,
-                ]);
-                $data = $metaData . '|' . $originalUrl;
+            '/(<img\s+[^>]*)src=["\']([^"\']+)["\']([^>]*>)/i',
+            function ($matches) use ($buildUrl) {
+                $originalUrl = $matches[2];
 
-                $encrypted = self::encrypt($data, $secretKey);
-                $encoded = rtrim(strtr(base64_encode($encrypted), '+/', '-_'), '=');
-                $proxyUrl = $workerUrl . '?u=' . $encoded;
-                return str_replace($originalUrl, $proxyUrl, $matches[0]);
+                return $matches[1]
+                    . 'src="' . $buildUrl(1, $originalUrl) . '"'
+                    . ' srcset="' . $buildUrl(2, $originalUrl) . ' 2x"'
+                    . ' data-original-src="' . $buildUrl(0, $originalUrl) . '"'
+                    . ' data-cfimageproxy="true"'
+                    . $matches[3];
             },
             $content);
     }

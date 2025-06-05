@@ -54,11 +54,14 @@ export default {
       const options = {
         cf: {
           image: {
-            width: maxWidth, // 可调整最大宽度
             quality
           }
         }
       };
+
+      if (maxWidth > 0) {
+        options.cf.image.width = maxWidth;
+      }
 
       if (maxHeight > 0) {
         options.cf.image.height = maxHeight;
