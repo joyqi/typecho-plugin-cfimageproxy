@@ -66,10 +66,16 @@ class Plugin implements PluginInterface
         $maxHeight->addRule('isInteger', _t('最大高度必须是整数'));
         $form->addInput($maxHeight);
 
+        $thumbnailQuality = new Form\Element\Text('thumbnailQuality', null, 80,
+            _t('缩略图质量'), _t('缩略图质量，范围 1-100'));
+        $thumbnailQuality->addRule('required', _t('必须填写缩略图质量'));
+        $thumbnailQuality->addRule('isInteger', _t('缩略图质量必须是整数'));
+        $form->addInput($thumbnailQuality);
+
         $quality = new Form\Element\Text('quality', null, 80,
-            _t('图片质量'), _t('图片质量，范围 1-100'));
-        $quality->addRule('required', _t('必须填写图片质量'));
-        $quality->addRule('isInteger', _t('图片质量必须是整数'));
+            _t('详情图质量'), _t('详情图质量，范围 1-100'));
+        $quality->addRule('required', _t('必须填写详情图质量'));
+        $quality->addRule('isInteger', _t('详情图质量必须是整数'));
         $form->addInput($quality);
     }
 
@@ -142,50 +148,98 @@ class Plugin implements PluginInterface
             color: rgba(255, 255, 255, 0.7);
         }
         
+        .cf-image-dialog figure {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .cf-image-dialog figcaption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            box-sizing: border-box;
+            display: none;
+        }
+        
+        .cf-image-dialog figure:hover figcaption {
+            display: block;
+        }
+        
         ::backdrop {
             background: rgba(0, 0, 0, 0.8);
             overscroll-behavior: contain;
         }
+        
+        @media only screen and (max-width: 576px) {
+            .cf-image-dialog {
+                padding: 40px 0;
+            }
+        }
         </style>';
+
+        echo '<template id="cf-image-dialog-template">
+            <dialog class="cf-image-dialog">
+                <div class="cf-image-loading"></div>
+                <button autoFocus></button>
+            </dialog>
+        </template>';
 
         echo '<script>
             document.addEventListener("DOMContentLoaded", function() {
                 const images = document.querySelectorAll("img[data-cfimageproxy]");
+                const template = document.getElementById("cf-image-dialog-template");
+                
                 images.forEach(img => {
                     img.addEventListener("click", function() {
-                        const dialog = document.createElement("dialog");
-                        const closeButton = document.createElement("button");
-                        const image = document.createElement("img");
-                        const loading = document.createElement("div");
+                        const dialog = template.content.cloneNode(true).querySelector(".cf-image-dialog");
+                        const closeButton = dialog.querySelector("button");
+                        const loading = dialog.querySelector(".cf-image-loading");
                         
-                        closeButton.setAttribute("autoFocus", "true");
+                        const image = document.createElement("img");
+                        const figure = document.createElement("figure");
+                        const title = img.getAttribute("title") || img.getAttribute("alt") || "";
+                        figure.appendChild(image);
+                        
+                        if (title) {
+                            const caption = document.createElement("figcaption");
+                            caption.textContent = title;
+                            figure.appendChild(caption);
+                        }
+                        
                         image.src = img.dataset.originalSrc;
-                        loading.classList.add("cf-image-loading");
-                        dialog.classList.add("cf-image-dialog");
-                        dialog.appendChild(loading);
                         document.body.appendChild(dialog);
                         
                         closeButton.addEventListener("click", function() {
-                            dialog.close("cancel");
+                            dialog.close();
+                            image.src = "";
                             dialog.remove();
                         });
                         
                         image.addEventListener("load", function() {
-                            const padding = parseInt(getComputedStyle(dialog).padding) || 0;
+                            const px = parseInt(getComputedStyle(dialog).paddingLeft) || 0;
+                            const py = parseInt(getComputedStyle(dialog).paddingTop) || 0;
                             const pixelRatio = window.devicePixelRatio > 1 ? 2 : 1;
                             const w = image.naturalWidth / pixelRatio;
                             const h = image.naturalHeight / pixelRatio;
                             
                             const ratio = Math.min(
-                                (window.innerWidth - padding * 2) / w,
-                                (window.innerHeight - padding * 2) / h 
+                                (window.innerWidth - px * 2) / w,
+                                (window.innerHeight - py * 2) / h 
                             );
                             
                             image.style.width = Math.min(w, w * ratio) + "px";
                             image.style.height = Math.min(h, h * ratio) + "px";
                             dialog.removeChild(loading);
-                            dialog.appendChild(closeButton);
-                            dialog.appendChild(image);
+                            dialog.appendChild(figure);
                         });
                         
                         dialog.showModal();
@@ -202,14 +256,22 @@ class Plugin implements PluginInterface
         $maxWidth = Helper::options()->plugin('CfImageProxy')->maxWidth;
         $maxHeight = Helper::options()->plugin('CfImageProxy')->maxHeight;
         $quality = Helper::options()->plugin('CfImageProxy')->quality;
+        $thumbnailQuality = Helper::options()->plugin('CfImageProxy')->thumbnailQuality ?? $quality;
 
         if (empty($workerUrl) || empty($secretKey)) return $content;
 
-        $buildUrl = function ($ratio, $originalUrl) use ($workerUrl, $secretKey, $maxWidth, $maxHeight, $quality) {
+        $buildUrl = function ($ratio, $originalUrl) use (
+            $workerUrl,
+            $secretKey,
+            $maxWidth,
+            $maxHeight,
+            $quality,
+            $thumbnailQuality
+        ) {
             $metaData = json_encode([
                 'maxWidth' => $maxWidth * $ratio,
                 'maxHeight' => $maxHeight * $ratio,
-                'quality' => $quality,
+                'quality' => $ratio > 0 ? $thumbnailQuality : $quality,
             ]);
             $data = $metaData . '|' . $originalUrl;
 
@@ -229,6 +291,7 @@ class Plugin implements PluginInterface
                     . ' srcset="' . $buildUrl(2, $originalUrl) . ' 2x"'
                     . ' data-original-src="' . $buildUrl(0, $originalUrl) . '"'
                     . ' data-cfimageproxy="true"'
+                    . ' loading="lazy"'
                     . $matches[3];
             },
             $content);
